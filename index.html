@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0b1020" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<title>Dude Mobile</title>
+<link rel="stylesheet" href="./css/app.css" />
+</head>
+<body>
+  <!-- ░░ SIGN IN ░░ -->
+  <section id="screen-auth" class="screen">
+    <div class="card">
+      <div class="brand"><div class="dude" id="authDude"></div><h1>Dude Mobile</h1></div>
+      <p class="sub">Control your Mac with your Jack Account.</p>
+      <input id="ident" autocomplete="username" placeholder="username or email" />
+      <input id="pass" type="password" autocomplete="current-password" placeholder="password" />
+      <input id="displayName" class="hidden" placeholder="display name (optional)" />
+      <button id="primaryBtn" class="primary">Sign in</button>
+      <div class="row">
+        <button id="googleBtn" class="ghost">Google</button>
+        <button id="toggleBtn" class="ghost">Create account</button>
+      </div>
+      <div class="msg" id="authMsg"></div>
+    </div>
+  </section>
+
+  <!-- ░░ PAIR ░░ -->
+  <section id="screen-pair" class="screen hidden">
+    <div class="card">
+      <div class="brand"><div class="dude"></div><h1>Pair your Mac</h1></div>
+      <p class="sub">Open Dude on your Mac → menu → <b>Dude Mobile</b> → Setup.
+         Type the 6-digit code it shows (it changes every minute).</p>
+      <div class="codebox">
+        <input id="codeInput" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" />
+      </div>
+      <button id="pairBtn" class="primary">Link</button>
+      <div class="msg" id="pairMsg"></div>
+      <button id="pairSignOut" class="linkbtn">Sign out</button>
+    </div>
+  </section>
+
+  <!-- ░░ HOME ░░ -->
+  <section id="screen-home" class="screen hidden">
+    <header class="topbar">
+      <div class="status"><span class="statusdot" id="deviceDot"></span><span id="deviceName">Mac</span></div>
+      <button id="menuBtn" class="iconbtn">⋯</button>
+    </header>
+
+    <div id="feed" class="feed"></div>
+
+    <!-- Meeseeks tray -->
+    <div id="tray" class="tray hidden"></div>
+
+    <div class="composer">
+      <div class="modeToggle">
+        <button data-mode="command" class="modeBtn active">Tell Dude</button>
+        <button data-mode="spawn" class="modeBtn">Spawn a dude</button>
+      </div>
+      <div id="colorPick" class="colors hidden"></div>
+      <div class="inputrow">
+        <textarea id="cmd" rows="1" placeholder="e.g. open Spotify and play lofi"></textarea>
+        <button id="sendBtn" class="send">↑</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- menu sheet -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheetcard">
+      <button id="unpairBtn" class="sheetitem">Unlink this Mac</button>
+      <button id="homeSignOut" class="sheetitem">Sign out</button>
+      <button id="sheetClose" class="sheetitem cancel">Cancel</button>
+    </div>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
