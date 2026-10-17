@@ -100,7 +100,7 @@ function watchScreen() {
   unsubs.push(onSnapshot(doc(fs.db, "dudes", uid, "screen", "current"), (snap) => {
     const d = snap.data();
     const at = d?.at?.toMillis ? d.at.toMillis() : 0;
-    const fresh = Date.now() - at < 12000;
+    const fresh = Date.now() - at < 15000;
     const panel = $("screenPanel");
     if (d?.active && d?.jpeg && fresh) {
       latestScreen = "data:image/jpeg;base64," + d.jpeg;
