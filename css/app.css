@@ -151,3 +151,17 @@ button:active { transform: translateY(1px); }
 .sheetitem { padding: 14px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--line2); color: var(--fg); font-size: 15px; text-align: left; }
 .sheetitem.cancel { color: var(--dim); border-color: transparent; }
 #unpairBtn { color: #ff8a7a; }
+
+/* stop (interrupt) button on a working dude chip */
+.dudechip .stop { margin-left: 2px; color: #ff8a7a; font-size: 11px; padding: 0 2px; }
+
+/* live screen preview */
+.screenpanel { position: relative; margin: 12px 14px 0; border: 1px solid var(--line2); border-radius: 6px; overflow: hidden; background: #000; }
+.screenpanel img { display: block; width: 100%; height: auto; image-rendering: auto; }
+.screenbadge { position: absolute; top: 7px; left: 7px; display: flex; align-items: center; gap: 6px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #fff;
+  background: rgba(0,0,0,.55); padding: 3px 7px; border-radius: 4px; }
+.livedot { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.screenfull { position: fixed; inset: 0; background: #000; z-index: 60; display: flex; align-items: center; justify-content: center; }
+.screenfull img { max-width: 100%; max-height: 100%; }

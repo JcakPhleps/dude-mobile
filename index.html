@@ -58,6 +58,12 @@
       <button id="spawnBtn" class="spawnbtn">＋ dude</button>
     </div>
 
+    <!-- live screen preview (shows while a dude is working) -->
+    <div id="screenPanel" class="screenpanel hidden">
+      <img id="screenImg" alt="live screen" />
+      <div class="screenbadge"><span class="livedot"></span>live · your mac</div>
+    </div>
+
     <div id="feed" class="feed">
       <div id="emptyHint" class="emptyhint">Spawn a dude to get started.<br>Each dude runs tasks on your Mac.</div>
     </div>
@@ -96,6 +102,9 @@
       <button id="spawnCancel" class="linkbtn">Cancel</button>
     </div>
   </div>
+
+  <!-- fullscreen live screen -->
+  <div id="screenFull" class="screenfull hidden"><img id="screenFullImg" alt="live screen" /></div>
 
   <!-- menu sheet -->
   <div id="sheet" class="sheet hidden">

@@ -92,7 +92,28 @@ function enterHome() {
   watchDevice();
   watchDudes();
   watchCommands();
+  watchScreen();
 }
+
+let latestScreen = null;
+function watchScreen() {
+  unsubs.push(onSnapshot(doc(fs.db, "dudes", uid, "screen", "current"), (snap) => {
+    const d = snap.data();
+    const at = d?.at?.toMillis ? d.at.toMillis() : 0;
+    const fresh = Date.now() - at < 12000;
+    const panel = $("screenPanel");
+    if (d?.active && d?.jpeg && fresh) {
+      latestScreen = "data:image/jpeg;base64," + d.jpeg;
+      $("screenImg").src = latestScreen;
+      panel.classList.remove("hidden");
+      if (!$("screenFull").classList.contains("hidden")) $("screenFullImg").src = latestScreen;
+    } else {
+      panel.classList.add("hidden");
+    }
+  }));
+}
+$("screenPanel").onclick = () => { if (latestScreen) { $("screenFullImg").src = latestScreen; $("screenFull").classList.remove("hidden"); } };
+$("screenFull").onclick = () => $("screenFull").classList.add("hidden");
 
 function watchDevice() {
   if (!deviceId) return;
@@ -125,6 +146,11 @@ function renderDudes() {
     if (d.status === "working") chip.appendChild(el("span", "spin"));
     else { const st = el("span", "st"); st.textContent = d.status === "spawning" ? "waking" : "ready"; chip.appendChild(st); }
     if (d.lifespan === "temp") { const t = el("span", "temp"); t.textContent = "1×"; chip.appendChild(t); }
+    if (d.status === "working") {
+      const stop = el("span", "stop"); stop.textContent = "■";
+      stop.onclick = (e) => { e.stopPropagation(); interrupt(id); };
+      chip.appendChild(stop);
+    }
     const x = el("span", "x"); x.textContent = "×";
     x.onclick = (e) => { e.stopPropagation(); poof(id); };
     chip.appendChild(x);
@@ -139,8 +165,9 @@ function renderTarget() {
   if (d) {
     t.classList.remove("hidden"); t.innerHTML = "";
     const orb = el("span", "orb"); orb.style.background = d.color; t.appendChild(orb);
-    t.appendChild(document.createTextNode(`telling ${d.name}`));
-    cmd.placeholder = "what should it do?";
+    const working = d.status === "working";
+    t.appendChild(document.createTextNode(working ? `${d.name} is working — interrupt?` : `telling ${d.name}`));
+    cmd.placeholder = working ? "interrupt & tell it something else" : "what should it do?";
     send.disabled = false;
   } else {
     t.classList.add("hidden");
@@ -248,11 +275,22 @@ async function send() {
   if (!text || !selectedId) return;
   cmd.value = ""; cmd.style.height = "auto";
   try {
+    // If it's mid-task, interrupt first so the current job stops and this runs next.
+    const d = dudes.get(selectedId);
+    if (d && d.status === "working") {
+      await setDoc(docOf("dudes", selectedId), { interrupt: true, updatedAt: serverTimestamp() }, { merge: true });
+    }
     await addDoc(colOf("commands"), {
       dudeId: selectedId, text, deviceId, source: "mobile",
       status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
   } catch (e) { alert(humanize(e)); }
+}
+
+// Just stop a dude (no new instruction).
+async function interrupt(id) {
+  try { await setDoc(docOf("dudes", id), { interrupt: true, updatedAt: serverTimestamp() }, { merge: true }); }
+  catch (e) { alert(humanize(e)); }
 }
 
 // ───────── menu ─────────
