@@ -103,13 +103,18 @@ function watchScreen() {
     const at = d?.at?.toMillis ? d.at.toMillis() : 0;
     const fresh = Date.now() - at < 15000;
     const panel = $("screenPanel");
-    if (d?.active && d?.jpeg && fresh) {
+    if (d?.active && fresh && d?.redacted) {
+      // Mac blacked it out (password/sensitive) — never show a stale frame.
+      latestScreen = null;
+      $("screenFull").classList.add("hidden");
+      panel.classList.remove("hidden"); panel.classList.add("locked");
+    } else if (d?.active && fresh && d?.jpeg) {
       latestScreen = "data:image/jpeg;base64," + d.jpeg;
       $("screenImg").src = latestScreen;
-      panel.classList.remove("hidden");
+      panel.classList.remove("hidden"); panel.classList.remove("locked");
       if (!$("screenFull").classList.contains("hidden")) $("screenFullImg").src = latestScreen;
     } else {
-      panel.classList.add("hidden");
+      panel.classList.add("hidden"); panel.classList.remove("locked");
     }
   }));
 }
