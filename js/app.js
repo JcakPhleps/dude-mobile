@@ -1,8 +1,9 @@
-// Dude Mobile — control your Mac through your Jack Account.
+// Dude Mobile — spawn dudes that run your Mac. No main dude here; the whole
+// point is the little guys you send off to do things.
 import { JackAccount, fs } from "/jack-account/js/jackaccount.js";
 
 const {
-  collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, setDoc, addDoc, deleteDoc,
   onSnapshot, query, orderBy, limit, serverTimestamp,
 } = fs;
 
@@ -15,21 +16,24 @@ const COLORS = [
   { name: "purple", hex: "#b58cff" },
   { name: "red",    hex: "#ff6b6b" },
   { name: "teal",   hex: "#4fd4d4" },
+  { name: "gold",   hex: "#ffd24d" },
 ];
 
 let uid = null;
 let deviceId = localStorage.getItem("dude.deviceId") || null;
-let mode = "command";
-let spawnColor = COLORS[1].hex;
+let dudes = new Map();          // id -> data
+let selectedId = null;
+let spawnColor = COLORS[0].hex;
+let spawnLife = "temp";
 const unsubs = [];
 function clearSubs() { while (unsubs.length) { try { unsubs.pop()(); } catch {} } }
 
-// ───────── screen routing ─────────
 function show(screen) {
   for (const s of ["auth", "pair", "home"]) $(`screen-${s}`).classList.toggle("hidden", s !== screen);
 }
 const colOf = (name) => collection(fs.db, "dudes", uid, name);
 const docOf = (name, id) => doc(fs.db, "dudes", uid, name, id);
+const colorName = (hex) => COLORS.find((c) => c.hex === hex)?.name || "blue";
 
 // ───────── auth ─────────
 let authMode = "signin";
@@ -55,9 +59,7 @@ $("googleBtn").onclick = async () => {
 };
 
 // ───────── pairing ─────────
-$("codeInput").addEventListener("input", (e) => {
-  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
-});
+$("codeInput").addEventListener("input", (e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6); });
 $("pairBtn").onclick = pair;
 async function pair() {
   const code = $("codeInput").value.trim();
@@ -77,9 +79,8 @@ async function pair() {
       name: p.deviceName || "Mac", platform: "macOS",
       pairedAt: serverTimestamp(), lastSeen: serverTimestamp(),
     }, { merge: true });
-    await updateDoc(doc(fs.db, "dudes", uid, "pairing", "current"), {
-      claimed: true, claimedBy: { at: serverTimestamp() },
-    });
+    await setDoc(doc(fs.db, "dudes", uid, "pairing", "current"),
+                 { claimed: true, claimedBy: { at: serverTimestamp() } }, { merge: true });
     enterHome();
   } catch (e) { setMsg("pairMsg", humanize(e)); }
 }
@@ -88,10 +89,9 @@ async function pair() {
 function enterHome() {
   show("home");
   clearSubs();
-  buildColorPicker();
   watchDevice();
+  watchDudes();
   watchCommands();
-  watchMeeseeks();
 }
 
 function watchDevice() {
@@ -100,78 +100,107 @@ function watchDevice() {
     const d = snap.data();
     $("deviceName").textContent = d?.name || "Mac";
     const seen = d?.lastSeen?.toMillis ? d.lastSeen.toMillis() : 0;
-    const online = Date.now() - seen < 20000;
-    $("deviceDot").classList.toggle("stale", !online);
+    $("deviceDot").classList.toggle("stale", Date.now() - seen >= 20000);
   }));
 }
 
-function watchCommands() {
-  const q = query(colOf("commands"), orderBy("createdAt", "asc"), limit(100));
+function watchDudes() {
+  const q = query(colOf("dudes"), orderBy("createdAt", "asc"), limit(40));
   unsubs.push(onSnapshot(q, (snap) => {
-    const feed = $("feed");
-    feed.innerHTML = "";
-    snap.forEach((docSnap) => renderCommand(feed, docSnap.data()));
+    dudes = new Map();
+    snap.forEach((d) => { const v = d.data(); if (v.status !== "gone" && v.status !== "dismissed") dudes.set(d.id, v); });
+    if (selectedId && !dudes.has(selectedId)) selectedId = null;
+    renderDudes();
+    renderTarget();
+  }));
+}
+
+function renderDudes() {
+  const wrap = $("dudes"); wrap.innerHTML = "";
+  for (const [id, d] of dudes) {
+    const chip = el("div", "dudechip" + (id === selectedId ? " sel" : ""));
+    const orb = el("span", "orb"); orb.style.background = d.color || "#6ea4ff";
+    chip.appendChild(orb);
+    chip.appendChild(document.createTextNode(d.name || "dude"));
+    if (d.status === "working") chip.appendChild(el("span", "spin"));
+    else { const st = el("span", "st"); st.textContent = d.status === "spawning" ? "waking" : "ready"; chip.appendChild(st); }
+    if (d.lifespan === "temp") { const t = el("span", "temp"); t.textContent = "1×"; chip.appendChild(t); }
+    const x = el("span", "x"); x.textContent = "×";
+    x.onclick = (e) => { e.stopPropagation(); poof(id); };
+    chip.appendChild(x);
+    chip.onclick = () => { selectedId = id; renderDudes(); renderTarget(); $("cmd").focus(); };
+    wrap.appendChild(chip);
+  }
+}
+
+function renderTarget() {
+  const t = $("target"), cmd = $("cmd"), send = $("sendBtn");
+  const d = selectedId && dudes.get(selectedId);
+  if (d) {
+    t.classList.remove("hidden"); t.innerHTML = "";
+    const orb = el("span", "orb"); orb.style.background = d.color; t.appendChild(orb);
+    t.appendChild(document.createTextNode(`telling ${d.name}`));
+    cmd.placeholder = "what should it do?";
+    send.disabled = false;
+  } else {
+    t.classList.add("hidden");
+    cmd.placeholder = "spawn or pick a dude first";
+    send.disabled = true;
+  }
+}
+
+function watchCommands() {
+  const q = query(colOf("commands"), orderBy("createdAt", "asc"), limit(120));
+  unsubs.push(onSnapshot(q, (snap) => {
+    const feed = $("feed"); feed.innerHTML = "";
+    let any = false;
+    snap.forEach((docSnap) => { any = true; renderCommand(feed, docSnap.data()); });
+    if (!any) {
+      const hint = el("div", "emptyhint");
+      hint.innerHTML = "Spawn a dude to get started.<br>Each dude runs tasks on your Mac.";
+      feed.appendChild(hint);
+    }
     feed.scrollTop = feed.scrollHeight;
   }));
 }
 
 function renderCommand(feed, c) {
-  // user message
+  const d = dudes.get(c.dudeId);
+  const color = d?.color || "#6ea4ff";
+  const name = d?.name || "dude";
+
   const me = el("div", "bubble me");
-  if (c.kind === "spawn" && c.color) {
-    const tag = el("span", "spawnTag");
-    tag.textContent = "spawned dude";
-    tag.style.background = c.color + "33"; tag.style.color = c.color;
-    me.appendChild(tag);
-  }
-  me.appendChild(document.createTextNode(c.text || ""));
+  me.textContent = c.text || "";
   feed.appendChild(me);
 
-  // dude reply / status
   const reply = el("div", "bubble dude");
+  const tag = el("div", "tag");
+  const orb = el("span", "orb"); orb.style.background = color; tag.appendChild(orb);
+  tag.appendChild(document.createTextNode(name));
+  reply.appendChild(tag);
+
+  const body = el("div");
   if (c.status === "pending" || c.status === "running") {
     reply.classList.add("pending");
-    reply.textContent = c.status === "running" ? "working on it…" : "sending to Dude…";
+    body.textContent = c.status === "running" ? "on it…" : "sending…";
   } else if (c.status === "error") {
     reply.classList.add("error");
-    reply.textContent = c.result || "That didn't work.";
+    body.textContent = c.result || "that didn't work.";
   } else {
-    reply.textContent = c.result || "done ✓";
+    body.textContent = c.result || "done ✓";
   }
+  reply.appendChild(body);
   feed.appendChild(reply);
 }
 
-function watchMeeseeks() {
-  const q = query(colOf("meeseeks"), orderBy("createdAt", "asc"), limit(30));
-  unsubs.push(onSnapshot(q, (snap) => {
-    const tray = $("tray");
-    tray.innerHTML = "";
-    let shown = 0;
-    snap.forEach((docSnap) => {
-      const m = docSnap.data();
-      if (m.status === "gone") return;
-      shown++;
-      const chip = el("div", "chip" + (m.status === "done" ? " done" : ""));
-      const mini = el("span", "dudeMini"); mini.style.background = m.color || "#6ea4ff";
-      chip.appendChild(mini);
-      chip.appendChild(document.createTextNode(m.label || "dude"));
-      chip.appendChild(m.status === "done" ? okTick() : el("span", "spin"));
-      tray.appendChild(chip);
-    });
-    tray.classList.toggle("hidden", shown === 0);
-  }));
-}
-function okTick() { const s = el("span"); s.textContent = "✓"; s.style.opacity = ".7"; return s; }
-
-// composer
-document.querySelectorAll(".modeBtn").forEach((b) => {
+// ───────── spawn ─────────
+$("spawnBtn").onclick = () => { buildColorPicker(); $("spawnSheet").classList.remove("hidden"); };
+$("spawnCancel").onclick = () => $("spawnSheet").classList.add("hidden");
+$("spawnSheet").addEventListener("click", (e) => { if (e.target.id === "spawnSheet") $("spawnSheet").classList.add("hidden"); });
+document.querySelectorAll(".lifeBtn").forEach((b) => {
   b.onclick = () => {
-    mode = b.dataset.mode;
-    document.querySelectorAll(".modeBtn").forEach((x) => x.classList.toggle("active", x === b));
-    $("colorPick").classList.toggle("hidden", mode !== "spawn");
-    $("cmd").placeholder = mode === "spawn"
-      ? "task for a one-off dude… (poofs when done)"
-      : "e.g. open Spotify and play lofi";
+    spawnLife = b.dataset.life;
+    document.querySelectorAll(".lifeBtn").forEach((x) => x.classList.toggle("active", x === b));
   };
 });
 function buildColorPicker() {
@@ -183,24 +212,50 @@ function buildColorPicker() {
     wrap.appendChild(sw);
   });
 }
+$("spawnGo").onclick = async () => {
+  const task = $("spawnTask").value.trim();
+  try {
+    const ref = await addDoc(colOf("dudes"), {
+      name: `${colorName(spawnColor)} dude`,
+      color: spawnColor, lifespan: spawnLife,
+      status: "spawning",   // the Mac flips this to idle/working
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    if (task) {
+      await addDoc(colOf("commands"), {
+        dudeId: ref.id, text: task, deviceId, source: "mobile",
+        status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
+    }
+    selectedId = ref.id;
+    $("spawnTask").value = "";
+    $("spawnSheet").classList.add("hidden");
+  } catch (e) { alert(humanize(e)); }
+};
+
+async function poof(id) {
+  try { await setDoc(docOf("dudes", id), { status: "dismissed", updatedAt: serverTimestamp() }, { merge: true }); }
+  catch (e) { alert(humanize(e)); }
+}
+
+// ───────── composer ─────────
 const cmd = $("cmd");
 cmd.addEventListener("input", () => { cmd.style.height = "auto"; cmd.style.height = Math.min(cmd.scrollHeight, 120) + "px"; });
 $("sendBtn").onclick = send;
 cmd.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 async function send() {
   const text = cmd.value.trim();
-  if (!text) return;
+  if (!text || !selectedId) return;
   cmd.value = ""; cmd.style.height = "auto";
-  const payload = {
-    text, kind: mode, deviceId, source: "mobile",
-    status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  };
-  if (mode === "spawn") payload.color = spawnColor;
-  try { await addDoc(colOf("commands"), payload); }
-  catch (e) { alert(humanize(e)); }
+  try {
+    await addDoc(colOf("commands"), {
+      dudeId: selectedId, text, deviceId, source: "mobile",
+      status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+  } catch (e) { alert(humanize(e)); }
 }
 
-// menu sheet
+// ───────── menu ─────────
 $("menuBtn").onclick = () => $("sheet").classList.remove("hidden");
 $("sheetClose").onclick = () => $("sheet").classList.add("hidden");
 $("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") $("sheet").classList.add("hidden"); });
@@ -214,11 +269,10 @@ $("unpairBtn").onclick = async () => {
 $("homeSignOut").onclick = () => JackAccount.signOut();
 $("pairSignOut").onclick = () => JackAccount.signOut();
 
-// ───────── routing on auth ─────────
+// ───────── routing ─────────
 function routeAfterAuth() {
   clearSubs();
   if (!uid) return show("auth");
-  // Linked if we have a device doc. Prefer stored id, else adopt the first.
   unsubs.push(onSnapshot(colOf("devices"), (snap) => {
     if (snap.empty) { deviceId = null; localStorage.removeItem("dude.deviceId"); return show("pair"); }
     if (!deviceId || !snap.docs.find((d) => d.id === deviceId)) {
@@ -228,10 +282,7 @@ function routeAfterAuth() {
   }, () => show("pair")));
 }
 
-JackAccount.onAuthState((user) => {
-  uid = user?.uid || null;
-  routeAfterAuth();
-});
+JackAccount.onAuthState((user) => { uid = user?.uid || null; routeAfterAuth(); });
 
 // ───────── helpers ─────────
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }

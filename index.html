@@ -14,8 +14,8 @@
   <!-- ░░ SIGN IN ░░ -->
   <section id="screen-auth" class="screen">
     <div class="card">
-      <div class="brand"><div class="dude" id="authDude"></div><h1>Dude Mobile</h1></div>
-      <p class="sub">Control your Mac with your Jack Account.</p>
+      <div class="brand"><div class="dude"></div><h1>Dude Mobile</h1></div>
+      <p class="sub">Spawn dudes to run your Mac, from your phone.</p>
       <input id="ident" autocomplete="username" placeholder="username or email" />
       <input id="pass" type="password" autocomplete="current-password" placeholder="password" />
       <input id="displayName" class="hidden" placeholder="display name (optional)" />
@@ -50,23 +50,50 @@
       <button id="menuBtn" class="iconbtn">⋯</button>
     </header>
 
-    <div id="feed" class="feed"></div>
+    <!-- your dudes -->
+    <div class="dudesbar">
+      <div id="dudes" class="dudes"></div>
+      <button id="spawnBtn" class="spawnbtn">＋ dude</button>
+    </div>
 
-    <!-- Meeseeks tray -->
-    <div id="tray" class="tray hidden"></div>
+    <div id="feed" class="feed">
+      <div id="emptyHint" class="emptyhint">Spawn a dude to get started.<br>Each dude runs tasks on your Mac.</div>
+    </div>
 
     <div class="composer">
-      <div class="modeToggle">
-        <button data-mode="command" class="modeBtn active">Tell Dude</button>
-        <button data-mode="spawn" class="modeBtn">Spawn a dude</button>
-      </div>
-      <div id="colorPick" class="colors hidden"></div>
+      <div id="target" class="target hidden"></div>
       <div class="inputrow">
-        <textarea id="cmd" rows="1" placeholder="e.g. open Spotify and play lofi"></textarea>
-        <button id="sendBtn" class="send">↑</button>
+        <textarea id="cmd" rows="1" placeholder="spawn or pick a dude first"></textarea>
+        <button id="sendBtn" class="send" disabled>↑</button>
       </div>
     </div>
   </section>
+
+  <!-- ░░ SPAWN SHEET ░░ -->
+  <div id="spawnSheet" class="sheet hidden">
+    <div class="sheetcard">
+      <h2>Spawn a dude</h2>
+
+      <div class="sheetlabel">Color</div>
+      <div id="colorPick" class="colors"></div>
+
+      <div class="sheetlabel">Lifespan</div>
+      <div class="lifespan">
+        <button data-life="temp" class="lifeBtn active">
+          <b>Temporary</b><span>poofs after one task</span>
+        </button>
+        <button data-life="long" class="lifeBtn">
+          <b>Long-term</b><span>sticks around until you poof it</span>
+        </button>
+      </div>
+
+      <div class="sheetlabel">First task <span class="opt">(optional)</span></div>
+      <textarea id="spawnTask" rows="2" placeholder="e.g. open Spotify and play lofi"></textarea>
+
+      <button id="spawnGo" class="primary">Spawn</button>
+      <button id="spawnCancel" class="linkbtn">Cancel</button>
+    </div>
+  </div>
 
   <!-- menu sheet -->
   <div id="sheet" class="sheet hidden">
