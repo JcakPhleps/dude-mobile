@@ -93,6 +93,7 @@ function enterHome() {
   watchDudes();
   watchCommands();
   watchScreen();
+  startViewerBeat();
 }
 
 let latestScreen = null;
@@ -114,6 +115,25 @@ function watchScreen() {
 }
 $("screenPanel").onclick = () => { if (latestScreen) { $("screenFullImg").src = latestScreen; $("screenFull").classList.remove("hidden"); } };
 $("screenFull").onclick = () => $("screenFull").classList.add("hidden");
+
+// Tell the Mac we're watching so it streams the screen the whole time the app
+// is open. Stops when the app is backgrounded/left (Mac stops streaming ~12s later).
+let viewerTimer = null;
+function startViewerBeat() {
+  stopViewerBeat();
+  const beat = () => {
+    if (!uid) return;
+    setDoc(doc(fs.db, "dudes", uid, "viewer", "current"),
+           { at: serverTimestamp(), deviceId }, { merge: true }).catch(() => {});
+  };
+  beat();
+  viewerTimer = setInterval(beat, 5000);
+}
+function stopViewerBeat() { if (viewerTimer) { clearInterval(viewerTimer); viewerTimer = null; } }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopViewerBeat();
+  else if (!$("screen-home").classList.contains("hidden")) startViewerBeat();
+});
 
 function watchDevice() {
   if (!deviceId) return;
@@ -310,6 +330,7 @@ $("pairSignOut").onclick = () => JackAccount.signOut();
 // ───────── routing ─────────
 function routeAfterAuth() {
   clearSubs();
+  stopViewerBeat();
   if (!uid) return show("auth");
   unsubs.push(onSnapshot(colOf("devices"), (snap) => {
     if (snap.empty) { deviceId = null; localStorage.removeItem("dude.deviceId"); return show("pair"); }
